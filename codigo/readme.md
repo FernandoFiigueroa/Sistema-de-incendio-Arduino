@@ -2,112 +2,149 @@
 #include <IRremote.h> 
 #include <LiquidCrystal.h> 
 #include <Servo.h>
-#define Tecla_Uno 0xFF00BF00
-#define remoto 11
+#define Tecla_Uno 0xEF10BF00
+#define Tecla_Dos 0xEE11BF00
+#define Tecla_Tres 0xED12BF00
+#define Tecla_Cuatro 0xEB14BF00
+#define Tecla_Cinco 0xEA15BF00
+#define teclaInicio 0xFF00BF00
+#define TeclaPausa 0xFD02BF00
 #define Led_Red1 12
 #define Led_Green 10
 #define IR 11
 
+int lecturaSensor,conversor,lecturaSensor1,estado;
+bool bandera = false;
+char mensaje;
 
-Servo PinControlServo; //le doy una nombre a la variable del objeto Servo
+
 LiquidCrystal lcd(4,5,6, 7, 8, 9); //defino los pines a los cuales esta conectado (rs,e(enable),d4,d5,d6,d7)
+IRrecv irrecv(IR); 
+decode_results codigo;
+Servo PinControlServo;
 
-   
+
 void setup()
 {
-  pinMode(Led_Red1, OUTPUT);
-  pinMode(Led_Green, OUTPUT);
-  PinControlServo.attach(3); //conecto el servo motor al pin 3
-  Serial.begin(9600);
-  lcd.begin(16, 2); //inicia la interfaz del lcd, determina sus dimensiones(ANCHO, ALTO) 
+  Serial.begin(9600);     
   IrReceiver.begin(IR, DISABLE_LED_FEEDBACK); 
+  pinMode(Led_Green, OUTPUT);
+  pinMode(Led_Red1, OUTPUT); 
+  lcd.begin(16, 2);//columnas y filas
+  PinControlServo.attach(3);
 }
 
 
-void loop()
-{	
-	 
-      int lecturaSensor = analogRead(A0); //el sensor recibe la temperatura
-      int conversor;
-      conversor = map(lecturaSensor,20,358,-40,125); //convierte lecturaSensor en un numero de -40 a 125
-      funcionPrincipal(conversor);
-      Serial.println(conversor);
-      delay(1000);	
-}
 
-
-void funcionPrincipal(int conversor)
+void loop() 
 {
-//mi funcion principal, dependiendo de la temperatura del conversor me ubico en la estacion del año y hago
-// que mi servomotor gire
-     if (conversor <= 0)
-      {
-        lcd.setCursor(0,0); //ubicados en el eje X y Y
-        lcd.print("INVIERNO");
-        darGiroServo(180,0,6000,1);
-
-      }
-      else if (conversor > 0 && conversor < 20)
-      {
-        lcd.setCursor(0,0);
-        lcd.print("OTONIO");
-        mostrarTemperatura(conversor);
-          darGiroServo(0,90,5000,1);
-
-      }
-      else if (conversor >= 20 && conversor < 30)
-      {
-        lcd.setCursor(0,0);
-        lcd.print("PRIMAVERA");
-        mostrarTemperatura(conversor);
-        darGiroServo(0,90,4000,1);
-
-      }
-      else if (conversor >= 30 && conversor < 50)
-      {
-        lcd.setCursor(0,0);
-        lcd.print("VERANO");
-        mostrarTemperatura(conversor);
-        darGiroServo(0,180,3000,1);
-      }
-
-      else if (conversor > 60)
-      {
-
-          lcd.setCursor(0,0);
-          lcd.print("!!!INCENDIOOO");
-          mostrarTemperatura(conversor);	
-          darGiroServo(0,200,500,0);		
-      }
+  
+ 	verificarCasos();
+  	
+   	if (bandera == true){
+    comenzarCodigo(bandera);
+    }
+    else
+    {
+    	lcd.clear();
+    }
+  	
+    delay (500);
 }
-    
-    
-void darGiroServo(int primerGiro ,int segundoGiro, int tiempo,int bandera)
+
+
+
+void verificarCasos()
 {
-   //funcion que hace dar vueltas a mi servo en determinado tiempo 
- 	 PinControlServo.write(primerGiro);
+	if(IrReceiver.decode()) 
+  	{ 
+       Serial.println(IrReceiver.decodedIRData.decodedRawData, HEX);  
+     	switch(IrReceiver.decodedIRData.decodedRawData)
+     	{
+          case teclaInicio:
+          	bandera = true;
+          break;
+          case TeclaPausa:
+          	bandera = false;
+        	break;
+          case Tecla_Uno:
+          		lcd.clear();
+           		lcd.setCursor(0,0);
+              lcd.print("INVIERNO");
+          	break;
+           case Tecla_Dos:
+          		lcd.clear();
+           		lcd.setCursor(0,0);
+              lcd.print("VERANO");
+          	break;
+           case Tecla_Tres:
+            	lcd.clear();	
+           		lcd.setCursor(0,0);
+              lcd.print("OTONIO");
+          	break;
+           case Tecla_Cuatro:
+         		 lcd.clear();
+           		lcd.setCursor(0,0);
+              lcd.print("PRIMAVERA");
+          	break;
+          
+        }
+   		 IrReceiver.resume();
+ 	 } 
+}
+
+
+
+void comenzarCodigo(bool bandera)
+{
+     	 
+ 			mostrarTemperatura();
+            /*convierte lecturaSensor en un numerode -40 a 125*/	
+            if (conversor > 60)
+            {
+                lcd.setCursor(0,0);
+                lcd.print("INCENDIOOO!!!!!!");
+                darGiroServo(0,180,900);
+                prendeYApagaLed(Led_Red1,1000,1);
+               lcd.clear();//Limpio el lcd
+            }
+            else
+            {
+              
+              prendeYApagaLed(Led_Green,1000,1);
+              
+            }
+  
+}
+ 
+
+void darGiroServo(int primerGiro ,int segundoGiro, int tiempo)
+{
+   	//	funcion que hace dar vueltas a mi servo en determinado tiempo 
+     PinControlServo.write(primerGiro);
      delay(tiempo);
      PinControlServo.write(segundoGiro);
      delay(tiempo);
-  if (bandera == 1)
-  {
-    prendeYApagaLed(Led_Green,1000,1);
-  }
-  else
-  {
-   prendeYApagaLed(Led_Red1,1000,1);
-  }
 }
 
-void mostrarTemperatura(int conversor)
+
+void mostrarTemperatura()
   // imprimo en el lcd la temperatura que recibe el sensor
 {
-    lcd.setCursor(0,1);
-    lcd.print("temperatura : ");
-   lcd.setCursor(13,1); //
-    lcd.print(conversor);
+  	lecturaSensor = analogRead(A0); //el sensor recibe la temperatura
+  	conversor = map(lecturaSensor,20,358,-40,125);
+	mensajeTemperatura(conversor);
 }
 
+
+void mensajeTemperatura(int conversor)
+{
+  lcd.setCursor(0,1);
+  lcd.print("temperatura: ");
+  lcd.setCursor(13,1); //
+  lcd.print(conversor);
+
+}
 
 void prendeYApagaLed(int led, int tiempo, int cantidadRepeticiones)
 {
@@ -119,4 +156,5 @@ void prendeYApagaLed(int led, int tiempo, int cantidadRepeticiones)
     digitalWrite(led, LOW);
     delay(0);
   }
-}```
+}
+```
